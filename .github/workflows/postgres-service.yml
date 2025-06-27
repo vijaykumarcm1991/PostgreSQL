@@ -1,0 +1,44 @@
+name: PostgreSQL Service Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-postgres:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:11
+        env:
+          POSTGRES_USER: myuser
+          POSTGRES_PASSWORD: mypassword
+          POSTGRES_DB: mydatabase
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U myuser"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Wait for PostgreSQL service to be ready
+        run: |
+          echo "Waiting for PostgreSQL to be ready..."
+          for i in {1..30}; do
+            if nc -z localhost 5432; then
+              echo "PostgreSQL is up!"
+              exit 0
+            fi
+            echo "PostgreSQL not yet ready, waiting..."
+            sleep 1
+          done
+          echo "PostgreSQL did not become ready in time."
+          exit 1
+
+      - name: Print success message
+        run: echo "✅ PostgreSQL service is running and ready!"
