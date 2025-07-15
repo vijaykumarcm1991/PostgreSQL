@@ -36,12 +36,17 @@ jobs:
           nc -z localhost 5432 || { echo "PostgreSQL service did not become ready in time!"; exit 1; }
           echo "PostgreSQL service is ready!"
 
-      - name: Verify PostgreSQL connection (optional, for more robust check)
+      - name: Verify PostgreSQL connection
         run: |
           # Install postgres client to connect and verify
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
-          # Attempt to connect to the database
-          psql -h localhost -p 5432 -U testuser -d testdb -c "\conninfo" || { echo "Failed to connect to PostgreSQL!"; exit 1; }
+          # Attempt to connect to the database, providing password via PGPASSWORD environment variable
+          PGPASSWORD=${{ services.postgres.env.POSTGRES_PASSWORD }} psql \
+            -h localhost \
+            -p 5432 \
+            -U ${{ services.postgres.env.POSTGRES_USER }} \
+            -d ${{ services.postgres.env.POSTGRES_DB }} \
+            -c "\conninfo" || { echo "Failed to connect to PostgreSQL!"; exit 1; }
           echo "Successfully connected to PostgreSQL database."
