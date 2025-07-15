@@ -1,26 +1,25 @@
-name: PostgreSQL Service Test
+name: PostgreSQL Service Check
 
-on:
-  workflow_dispatch:
+on: [push, workflow_dispatch]
 
 jobs:
-  test-postgres:
+  test-postgres-service:
     runs-on: ubuntu-latest
 
     services:
       postgres:
         image: postgres:11
         env:
-          POSTGRES_USER: myuser
-          POSTGRES_PASSWORD: mypassword
-          POSTGRES_DB: mydatabase
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: testdb
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U myuser"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout repository
@@ -28,17 +27,21 @@ jobs:
 
       - name: Wait for PostgreSQL service to be ready
         run: |
-          echo "Waiting for PostgreSQL to be ready..."
-          for i in {1..30}; do
-            if nc -z localhost 5432; then
-              echo "✅ PostgreSQL is up!"
-              exit 0
-            fi
-            echo "PostgreSQL not yet ready, retrying in 1s..."
+          echo "Waiting for PostgreSQL service to be ready..."
+          for i in `seq 1 10`; do
+            nc -z localhost 5432 && break
+            echo "PostgreSQL not yet ready, waiting 1 more second..."
             sleep 1
           done
-          echo "❌ PostgreSQL did not become ready in time."
-          exit 1
+          nc -z localhost 5432 || { echo "PostgreSQL service did not become ready in time!"; exit 1; }
+          echo "PostgreSQL service is ready!"
 
-      - name: Print success message
-        run: echo "✅ PostgreSQL service is running and ready!"
+      - name: Verify PostgreSQL connection (optional, for more robust check)
+        run: |
+          # Install postgres client to connect and verify
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+          # Attempt to connect to the database
+          psql -h localhost -p 5432 -U testuser -d testdb -c "\conninfo" || { echo "Failed to connect to PostgreSQL!"; exit 1; }
+          echo "Successfully connected to PostgreSQL database."
